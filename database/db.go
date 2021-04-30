@@ -12,14 +12,14 @@ import (
 // DB 数据库定义
 var DB = make(map[string]*sql.DB)
 
-//InitDB 初始化连接
+// InitDB 初始化连接
 func InitDB() {
-	GetConn(config.W.Source)
-	GetConn(config.W.Destination)
+	GetDB(config.C.Source)
+	GetDB(config.C.Destination)
 }
 
-//GetConn 获取连接
-func GetConn(conn config.Conn) *sql.DB {
+// GetConn 获取连接
+func GetDB(conn config.Conn) *sql.DB {
 	if _, ok := DB[conn.Host]; ok {
 		return DB[conn.Host]
 	}

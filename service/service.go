@@ -17,36 +17,39 @@ func Sync() {
 	var err error
 	var rows [][]string
 	var affectID int64
-	var lastID int64
+	var offset int64
 	var fistFlag bool
 
-	//读取配置文件到struct
+	// 读取配置文件到struct,初始化变量
 	config.InitConfig()
 
 	//连接数据库 同步表结构
-	dstDB := database.GetConn(config.W.Destination)
-	srcDB := database.GetConn(config.W.Source)
+	dstDB := database.GetDB(config.C.Destination)
+	srcDB := database.GetDB(config.C.Source)
 
 	//同步数据
-	for _, table := range config.W.Table {
+	for _, table := range config.C.Table {
 
 		if table.Rebuild {
 			err = truncateTable(dstDB, table)
 			if err != nil {
-				goto EXCEPTION
+				log.Println("err:", err)
+				return
 			}
 		}
 
 		fistFlag = true
-		lastID, err = fetchDstLatestID(dstDB, table)
+		offset, err = fetchDstCount(dstDB, table)
 		if err != nil {
-			goto EXCEPTION
+			log.Println("err:", err)
+			return
 		}
 
 		for fistFlag || len(rows) > 0 {
-			rows, lastID, err = fetchSrcRow(srcDB, table, lastID, table.Batch)
+			rows, offset, err = fetchSrcRow(srcDB, table, offset, table.Batch)
 			if err != nil {
-				goto EXCEPTION
+				log.Println("err:", err)
+				return
 			}
 
 			fistFlag = false
@@ -55,19 +58,19 @@ func Sync() {
 			for _, row := range rows {
 				affectID, err = insertDstRow(dstDB, table, row)
 				if err != nil {
-					goto EXCEPTION
+					log.Println("err:", err)
+					return
 				}
 				if affectID == 0 {
 					err = errors.New("affected rows is zero")
-					goto EXCEPTION
+					log.Println("err:", err)
+					return
 				}
 			}
 		}
 		log.Println("Done with Table " + table.Name)
 	}
 	return
-EXCEPTION:
-	log.Println("Aparently Oops -> ", err)
 }
 
 // insertDstRow insertDstRow
@@ -94,17 +97,17 @@ func insertDstRow(db *sql.DB, table config.TableInfo, row []string) (affect int6
 }
 
 // fetchSrcRow fetchSrcRow
-func fetchSrcRow(db *sql.DB, table config.TableInfo, id int64, size int64) (ret [][]string, offset int64, err error) {
+func fetchSrcRow(db *sql.DB, table config.TableInfo, offset int64, size int64) (ret [][]string, newOffset int64, err error) {
 	var rows *sql.Rows
 	str := "1"
 	var sl = []string{str}
 	sl = append(sl, table.Where...)
 	clause := strings.Join(sl[:], " and ")
-	var sql = "select * from " + table.Name + " where " + clause + " limit " + strconv.FormatInt(id, 10) + "," + strconv.FormatInt(size, 10)
+	var sqlStr = "select * from " + table.Name + " where " + clause + " limit " + strconv.FormatInt(offset, 10) + "," + strconv.FormatInt(size, 10)
 
-	log.Println(sql)
+	log.Println(sqlStr)
 
-	rows, err = db.Query(sql)
+	rows, err = db.Query(sqlStr)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -113,9 +116,9 @@ func fetchSrcRow(db *sql.DB, table config.TableInfo, id int64, size int64) (ret 
 	if err != nil {
 		return nil, 0, err
 	}
-	lsize := len(columns)
-	pts := make([]interface{}, lsize)
-	container := make([]interface{}, lsize)
+	colSize := len(columns)
+	pts := make([]interface{}, colSize)
+	container := make([]interface{}, colSize)
 	for i := range pts {
 		pts[i] = &container[i]
 	}
@@ -127,19 +130,19 @@ func fetchSrcRow(db *sql.DB, table config.TableInfo, id int64, size int64) (ret 
 		}
 		sl := toString(container)
 		ret = append(ret, sl)
-		//offset, err = strconv.ParseInt(sl[0], 10, 0)
-		//if err != nil {
-		//	return nil, 0, err
-		//}
 	}
-	rows.Close()
-	if offset == 0 {
-		offset = id + size
+	err = rows.Close()
+	if err != nil {
+		return nil, 0, err
+	}
+	if newOffset == 0 {
+		newOffset = offset + size
 	}
 	log.Println("Fetched offset:", offset, " - size:", size)
-	return ret, offset, nil
+	return ret, newOffset, nil
 }
 
+// toString 转成字符串
 func toString(columns []interface{}) []string {
 	var strCln []string
 	for _, column := range columns {
@@ -151,33 +154,38 @@ func toString(columns []interface{}) []string {
 	return strCln
 }
 
-func fetchDstLatestID(db *sql.DB, table config.TableInfo) (id int64, err error) {
+// fetchDstCount 获取dst库表记录数量
+func fetchDstCount(db *sql.DB, table config.TableInfo) (count int64, err error) {
 	var rows *sql.Rows
-	var sql = "select count(*) as id from " + table.Name
-	rows, err = db.Query(sql)
+	var sqlStr = "select count(*) as count from " + table.Name
+	rows, err = db.Query(sqlStr)
 	if err != nil {
 		return 0, err
 	}
 	for rows.Next() {
-		err = rows.Scan(&id)
+		err = rows.Scan(&count)
 		if err != nil {
-			log.Println(1)
 			return 0, err
 		}
 	}
-	rows.Close()
-	return id, nil
+	err = rows.Close()
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
 }
 
+// truncateTable 清空表数据
 func truncateTable(db *sql.DB, table config.TableInfo) (err error) {
-	var sql = "truncate table " + table.Name
-	_, err = db.Exec(sql)
+	var sqlStr = "truncate table " + table.Name
+	_, err = db.Exec(sqlStr)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+// convertString 字段内容单引号转换
 func convertString(arg string) string {
 	var buf strings.Builder
 	buf.WriteRune('\'')

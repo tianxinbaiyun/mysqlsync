@@ -7,15 +7,15 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-//Wraper yaml
-type Wraper struct {
+//Config 配置信息 yaml 结构体
+type Config struct {
 	Version     string      `yaml:"version"`
 	Source      Conn        `yaml:"src"`
 	Destination Conn        `yaml:"dst"`
 	Table       []TableInfo `yaml:"table"`
 }
 
-//Conn conn
+//Conn 数据库连接结构体
 type Conn struct {
 	Host     string `yaml:"host"`
 	User     string `yaml:"user"`
@@ -24,7 +24,7 @@ type Conn struct {
 	Port     string `yaml:"port"`
 }
 
-//TableInfo info
+//TableInfo 表结构体
 type TableInfo struct {
 	Name    string   `yaml:"name"`
 	Rebuild bool     `yaml:"rebuild"`
@@ -32,8 +32,8 @@ type TableInfo struct {
 	Where   []string `yaml:"where"`
 }
 
-// W W
-var W = Wraper{}
+// C 全局配置信息
+var C = Config{}
 
 // InitConfig 初始化配置
 func InitConfig() {
@@ -41,5 +41,8 @@ func InitConfig() {
 	if err != nil {
 		log.Println(err)
 	}
-	yaml.Unmarshal(ret, &W)
+	err = yaml.Unmarshal(ret, &C)
+	if err != nil {
+		panic(err)
+	}
 }
