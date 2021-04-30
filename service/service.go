@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strconv"
 	"strings"
 	"tool.site/dbsync/config"
 	"tool.site/dbsync/database"
@@ -14,11 +13,14 @@ import (
 // Sync 同步函数
 func Sync() {
 
-	var err error
-	var rows [][]string
-	var affectID int64
-	var offset int64
-	var fistFlag bool
+	// 变量定义
+	var (
+		err      error
+		rows     [][]string
+		affectID int64
+		offset   int64
+		fistFlag bool
+	)
 
 	// 读取配置文件到struct,初始化变量
 	config.InitConfig()
@@ -29,7 +31,7 @@ func Sync() {
 
 	//同步数据
 	for _, table := range config.C.Table {
-
+		// 如果配置重建，则清空数据
 		if table.Rebuild {
 			err = truncateTable(dstDB, table)
 			if err != nil {
@@ -39,6 +41,9 @@ func Sync() {
 		}
 
 		fistFlag = true
+		syncCount := 0
+
+		// 获取目标表数据数量
 		offset, err = fetchDstCount(dstDB, table)
 		if err != nil {
 			log.Println("err:", err)
@@ -46,15 +51,22 @@ func Sync() {
 		}
 
 		for fistFlag || len(rows) > 0 {
+
+			// 从新获取数据
 			rows, offset, err = fetchSrcRow(srcDB, table, offset, table.Batch)
 			if err != nil {
 				log.Println("err:", err)
 				return
 			}
 
+			rowLen := len(rows)
+
+			if rowLen <= 0 {
+				break
+			}
 			fistFlag = false
 
-			//TODO 如果数据插入异常怎么办 主键重复
+			// 循环插入数据
 			for _, row := range rows {
 				affectID, err = insertDstRow(dstDB, table, row)
 				if err != nil {
@@ -62,30 +74,42 @@ func Sync() {
 					return
 				}
 				if affectID == 0 {
-					err = errors.New("affected rows is zero")
+					err = errors.New("affected rows is 0")
 					log.Println("err:", err)
 					return
 				}
 			}
+
+			// 统计同步数量
+			syncCount = syncCount + rowLen
+
+			// 如果返回数量小于size，结束循环
+			if int64(rowLen) < table.Batch {
+				break
+			}
 		}
-		log.Println("Done with Table " + table.Name)
+		log.Printf("sync done Table %s sync count %d", table.Name, syncCount)
 	}
 	return
 }
 
 // insertDstRow insertDstRow
 func insertDstRow(db *sql.DB, table config.TableInfo, row []string) (affect int64, err error) {
-	str := ""
+
+	// 拼凑values
+	values := ""
 	for _, s := range row {
 		if s != "nil" {
-			str = fmt.Sprintf("%s,%s", str, convertString(s))
+			values = fmt.Sprintf("%s,%s", values, convertString(s))
 		} else {
-			str = fmt.Sprintf("%s,null", str)
+			values = fmt.Sprintf("%s,null", values)
 		}
 	}
-	var s = "insert into " + table.Name + " values (" + strings.Trim(str, ",") + ")"
+	values = strings.Trim(values, ",")
+
+	var sqlStr = fmt.Sprintf("insert into %s values ( %s )", table.Name, values)
 	var ret sql.Result
-	ret, err = db.Exec(s)
+	ret, err = db.Exec(sqlStr)
 	if err != nil {
 		return 0, err
 	}
@@ -96,17 +120,24 @@ func insertDstRow(db *sql.DB, table config.TableInfo, row []string) (affect int6
 	return rowCount, nil
 }
 
-// fetchSrcRow fetchSrcRow
+// fetchSrcRow 查询源数据
 func fetchSrcRow(db *sql.DB, table config.TableInfo, offset int64, size int64) (ret [][]string, newOffset int64, err error) {
 	var rows *sql.Rows
-	str := "1"
-	var sl = []string{str}
+
+	// 条件字符串拼接
+	sl := make([]string, 0)
 	sl = append(sl, table.Where...)
-	clause := strings.Join(sl[:], " and ")
-	var sqlStr = "select * from " + table.Name + " where " + clause + " limit " + strconv.FormatInt(offset, 10) + "," + strconv.FormatInt(size, 10)
+	andWhere := strings.Join(sl[:], " and ")
+	andWhere = strings.Trim(andWhere, "and")
+	var sqlStr = fmt.Sprintf("select * from %s", table.Name)
+	if andWhere != "" && strings.Trim(andWhere, " ") != "1" {
+		sqlStr = fmt.Sprintf("%s where %s", sqlStr, andWhere)
+	}
+	sqlStr = fmt.Sprintf("%s limit %d,%d", sqlStr, offset, size)
 
 	log.Println(sqlStr)
 
+	// 查询数据
 	rows, err = db.Query(sqlStr)
 	if err != nil {
 		return nil, 0, err
@@ -178,6 +209,7 @@ func fetchDstCount(db *sql.DB, table config.TableInfo) (count int64, err error) 
 // truncateTable 清空表数据
 func truncateTable(db *sql.DB, table config.TableInfo) (err error) {
 	var sqlStr = "truncate table " + table.Name
+	log.Println(sqlStr)
 	_, err = db.Exec(sqlStr)
 	if err != nil {
 		return err

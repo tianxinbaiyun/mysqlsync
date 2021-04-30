@@ -16,9 +16,9 @@ table:
     rebuild: True
     batch: 2000
     where: 
-      - 1
-  - name: item_trace
-    rebuild: True
-    batch: 1000
-    where: 
-      - 1
+#      -
+#  - name: item_trace
+#    rebuild: True
+#    batch: 1000
+#    where:
+#      -
