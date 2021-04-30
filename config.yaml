@@ -1,0 +1,24 @@
+version: 0.01
+src: 
+  host: 172.16.3.158
+  user: root
+  pwd: 123456
+  dbname: spa_catalog_items
+  port: 3306
+dst: 
+  host: 127.0.0.1
+  user: root
+  pwd: 123456
+  dbname: spa_catalog_items
+  port: 3306 
+table:
+  - name: item
+    rebuild: True
+    batch: 2000
+    where: 
+      - 1
+  - name: item_trace
+    rebuild: True
+    batch: 1000
+    where: 
+      - 1
