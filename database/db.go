@@ -18,7 +18,7 @@ func InitDB() {
 	GetDB(config.C.Destination)
 }
 
-// GetConn 获取连接
+// GetDB 获取连接
 func GetDB(conn config.Conn) *sql.DB {
 	if _, ok := DB[conn.Host]; ok {
 		return DB[conn.Host]
