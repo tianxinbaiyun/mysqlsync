@@ -8,5 +8,6 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/stretchr/testify v1.4.0
 	gopkg.in/yaml.v2 v2.4.0
 )
