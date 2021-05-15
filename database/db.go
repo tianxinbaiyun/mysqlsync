@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"log"
 
-	"tool.site/dbsync/config"
+	"github.com/tianxinbaiyun/mysqlsync/config"
 
 	_ "github.com/go-sql-driver/mysql" //mysql
 )

@@ -3,9 +3,9 @@ package main
 import (
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/tianxinbaiyun/mysqlsync/crontab"
+	"github.com/tianxinbaiyun/mysqlsync/service"
 	"net/http"
-	"tool.site/dbsync/crontab"
-	"tool.site/dbsync/service"
 )
 
 func main() {

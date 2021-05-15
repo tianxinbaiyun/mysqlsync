@@ -2,8 +2,8 @@ package crontab
 
 import (
 	"github.com/robfig/cron/v3"
+	"github.com/tianxinbaiyun/mysqlsync/service"
 	"log"
-	"tool.site/dbsync/service"
 )
 
 // AddCron 添加定时任务

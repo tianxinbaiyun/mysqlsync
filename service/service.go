@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/tianxinbaiyun/mysqlsync/config"
+	"github.com/tianxinbaiyun/mysqlsync/database"
 	"log"
 	"strings"
-	"tool.site/dbsync/config"
-	"tool.site/dbsync/database"
 )
 
 // Sync 同步函数

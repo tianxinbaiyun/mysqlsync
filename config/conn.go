@@ -3,6 +3,7 @@ package config
 import (
 	"io/ioutil"
 	"log"
+	"os"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -37,7 +38,12 @@ var C = Config{}
 
 // InitConfig 初始化配置
 func InitConfig() {
-	ret, err := ioutil.ReadFile("./config.yaml")
+	fileName := "./config.yaml"
+	//目录不存在，从指定的目录找
+	if _, err := os.Stat(fileName); os.IsNotExist(err) {
+		fileName = "../config.yaml"
+	}
+	ret, err := ioutil.ReadFile(fileName)
 	if err != nil {
 		log.Println(err)
 	}

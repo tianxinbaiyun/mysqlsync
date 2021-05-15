@@ -1,4 +1,4 @@
-module tool.site/dbsync
+module github.com/tianxinbaiyun/mysqlsync
 
 go 1.15
 
